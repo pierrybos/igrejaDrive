@@ -5,13 +5,14 @@ import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
-import type { ReactNode } from "react";
 
-interface Props { children: ReactNode; params: { slug: string } }
+interface Props { children: ReactNode; params: Promise<{ slug: string }>
+ }
 
 export default async function DashboardLayout({ children, params }: Props) {
   const session = await getServerSession(authOptions);
-  const { slug } = params;
+  const { slug } = await params
+
 
   if (!session) {
     return redirect(`/${slug}/login`);
@@ -65,21 +66,24 @@ export default async function DashboardLayout({ children, params }: Props) {
           <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard`}>
             Visão Geral
           </Link>
+          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/participants`}>
+              Participações
+          </Link>
           <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/participation-types`}>
               Tipos de Participação
           </Link>
           <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/program-parts`}>
               Partes do Programa
           </Link>
-          <Link
-  href={`/${slug}/dashboard/drive-config`}
-  className="block px-3 py-1 rounded hover:bg-gray-100"
->
-  Configurações do Drive
-</Link>
+          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/bible-version`}>
+              Versões da Bíblia
+          </Link>
+          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/drive-config`}>
+              Configurações do Drive
+          </Link>
         </nav>
       </aside>
       <main className="flex-1 p-6">{children}</main>
     </div>
-  );;
+  );
 }

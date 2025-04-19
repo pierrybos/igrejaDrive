@@ -4,7 +4,7 @@ import ProgramPartsForm from "./create-form";
 import ToggleButton from "@/components/ToggleButton";
 
 export default async function ProgramPartsPage({ params }: { params: { slug: string } }) {
-  const types = await prisma.programPart.findMany({
+  const types = await prisma.programParts.findMany({
     where: { institution: { slug: params.slug } },
     orderBy: { createdAt: "desc" },
   });

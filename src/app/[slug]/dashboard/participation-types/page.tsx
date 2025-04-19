@@ -4,7 +4,7 @@ import ParticipationTypeForm from "./create-form";
 import ToggleButton from "@/components/ToggleButton";
 
 export default async function ParticipationTypesPage({ params }: { params: { slug: string } }) {
-  const types = await prisma.participationType.findMany({
+  const types = await prisma.participationTypes.findMany({
     where: { institution: { slug: params.slug } },
     orderBy: { createdAt: "desc" },
   });

@@ -13,15 +13,98 @@ enum Role {
   USER
 }
 
+enum ParticipantStatus {
+  Pendente
+  Aprovado
+  Rejeitado
+}
+
+/// versões candidatas, definidas uma única vez (em qualquer idioma)
+model BibleVersion {
+  id           String                    @id @default(cuid())
+  code         String                    @unique // ex: "ACF", "NVI", etc
+  name         String // ex: "Almeida Corrigida Fiel"
+  language     String // ex: "pt" ou "en"
+  // relação N‑N com instituições, via tabela de join:
+  institutions InstitutionBibleVersion[]
+  // relação 1‑N com participações, quando o participante escolhe esta versão
+  participants Participant[]
+}
+
+//// tabela de habilitação por instituição
+model InstitutionBibleVersion {
+  id             String   @id @default(cuid())
+  institutionId  String
+  bibleVersionId String
+  isActive       Boolean  @default(true)
+  updatedAt      DateTime @updatedAt
+
+  institution  Institution  @relation(fields: [institutionId], references: [id])
+  bibleVersion BibleVersion @relation(fields: [bibleVersionId], references: [id])
+
+  @@unique([institutionId, bibleVersionId])
+}
+
 model Institution {
-  id                String              @id @default(cuid())
+  id                 String                    @id @default(cuid())
+  name               String
+  slug               String                    @unique
+  createdAt          DateTime                  @default(now())
+  participants       Participant[]
+  users              User[]
+  participationTypes ParticipationType[] // use camelCase e plural
+  programParts       ProgramPart[] // idem
+  bibleVersions      InstitutionBibleVersion[] // relação N‑N para habilitações
+  driveConfig        DriveConfig?
+}
+
+model Participant {
+  id            Int         @id @default(autoincrement())
+  institutionId String
+  institution   Institution @relation(fields: [institutionId], references: [id])
+
+  // dados básicos
   name              String
-  slug              String              @unique
-  createdAt         DateTime            @default(now())
-  users             User[]
-  ParticipationType ParticipationType[]
-  ProgramPart       ProgramPart[]
-  driveConfig       DriveConfig?
+  churchGroupState  String // antes “group”
+  participationDate DateTime
+
+  // ligações aos tipos e partes do programa
+  programPartId       String?
+  programPart         ProgramPart?       @relation(fields: [programPartId], references: [id])
+  participationTypeId String?
+  participationType   ParticipationType? @relation(fields: [participationTypeId], references: [id])
+
+  // status e flags
+  status             ParticipantStatus @default(Pendente)
+  isActive           Boolean           @default(true)
+  isWhatsApp         Boolean           @default(false)
+  imageRightsGranted Boolean           @default(false)
+  isMember           Boolean           @default(false)
+
+  // detalhes técnicos
+  phone           String?
+  performanceType String        @default("Solo")
+  microphoneCount Int           @default(1)
+  bibleVersionId  String? // FK pra quem for o dropdown
+  bibleVersion    BibleVersion? @relation(fields: [bibleVersionId], references: [id])
+  observations       String?            
+
+  // foto e arquivos
+  userPhotoUrl String? // URL da foto no Drive
+  files        File[] // relação 1‑N
+
+  // timestamps
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model File {
+  id            String      @id @default(cuid())
+  participantId Int
+  participant   Participant @relation(fields: [participantId], references: [id])
+  name          String
+  url           String
+  createdAt     DateTime    @default(now())
 }
 
 model DriveConfig {
@@ -75,25 +158,27 @@ model VerificationToken {
 }
 
 model ParticipationType {
-  id            String      @id @default(cuid())
+  id            String        @id @default(cuid())
   code          String
   label         String
   institutionId String
-  institution   Institution @relation(fields: [institutionId], references: [id])
-  isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
+  institution   Institution   @relation(fields: [institutionId], references: [id])
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  Participant   Participant[]
 
   @@unique([institutionId, code])
 }
 
 model ProgramPart {
-  id            String      @id @default(cuid())
+  id            String        @id @default(cuid())
   code          String
   label         String
   institutionId String
-  institution   Institution @relation(fields: [institutionId], references: [id])
-  isActive      Boolean     @default(true)
-  createdAt     DateTime    @default(now())
+  institution   Institution   @relation(fields: [institutionId], references: [id])
+  isActive      Boolean       @default(true)
+  createdAt     DateTime      @default(now())
+  Participant   Participant[]
 
   @@unique([institutionId, code])
 }
