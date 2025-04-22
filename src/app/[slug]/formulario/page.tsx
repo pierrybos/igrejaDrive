@@ -1,7 +1,7 @@
 // File: src/app/[slug]/formulario/page.tsx
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useParams } from "next/navigation";
 import Image from "next/image";
 import MaskedInput from "react-text-mask";
@@ -19,9 +19,19 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Slider } from "@/components/ui/slider";
+import { Card, CardContent } from "@/components/ui/card";
+import {
+  Slider,
+  SliderTrack,
+  SliderRange,
+  SliderThumb,
+} from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
+import { File } from "lucide-react";
+import {
+  DEFAULT_FORM_CONFIG,
+  FormConfigType
+} from "@/lib/formConfig";
 
 interface DriveConfig {
   serviceAccountJson: any;
@@ -41,34 +51,55 @@ interface Option {
   label: string;
 }
 
+
+type FormConfig = {
+  showMemberField: boolean;
+  memberFieldLabel: string;
+  showImageConsentField: boolean;
+  imageConsentLabel: string;
+  formHeaderText?: string;         // novo
+  showOtherField: boolean;         // novo, se usar
+  otherFieldLabel: string;         // novo, se usar
+  autoConsentForMembers: boolean;
+};
+
+// Estado inicial do formulário para reset
+const initialFormData = {
+  participantName: "",
+  churchGroupState: "",
+  participationDate: "",
+  programPart: "",
+  participationType: "",
+  microphoneCount: 1,
+  phone: "",
+  isWhatsApp: false,
+  files: [] as File[],
+  observations: "",
+  userPhoto: null as File | null,
+  imageRightsGranted: false,
+  isMember: false,
+  bibleVersion: "",
+};
+
 export default function FormPage() {
   const { slug } = useParams();
+
+  // Refs para limpar inputs de arquivo
+  const photoInputRef = useRef<HTMLInputElement>(null);
+  const filesInputRef = useRef<HTMLInputElement>(null);
 
   const [programParts, setProgramParts] = useState<Option[]>([]);
   const [participationTypes, setParticipationTypes] = useState<Option[]>([]);
   const [driveConfig, setDriveConfig] = useState<DriveConfig | null>(null);
   const [bibleVersions, setBibleVersions] = useState<BibleVersionOption[]>([]);
 
-  // Form state
-  const [formData, setFormData] = useState({
-    participantName: "",
-    churchGroupState: "",
-    participationDate: "",
-    programPart: "",
-    participationType: "",
-    microphoneCount: 1,
-    phone: "",
-    isWhatsApp: false,
-    files: [] as File[],
-    observations: "",
-    userPhoto: null as File | null,
-    imageRightsGranted: false,
-    isMember: false,
-    bibleVersion: "",
-  });
+  // Form state usando initialFormData
+  const [formData, setFormData] = useState(initialFormData);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const extensionList = getAllExtensions().join(",");
+  const [config, setConfig] = useState<FormConfigType>(DEFAULT_FORM_CONFIG);
+
 
   useEffect(() => {
     async function fetchData() {
@@ -90,8 +121,21 @@ export default function FormPage() {
       }
     }
     fetchData();
+
+    fetch(`/api/${slug}/form-config`)
+    .then(res => res.json())
+    .then((data: FormConfigType) => setConfig(data))
+    .catch(() => {
+      // em caso de erro, mantém DEFAULT_FORM_CONFIG
+    });
   }, [slug]);
 
+
+  useEffect(() => {
+    if (config.autoConsentForMembers && formData.isMember) {
+      handleChange("imageRightsGranted", true);
+    }
+  }, [config.autoConsentForMembers, formData.isMember]);
 
     // Verifica se o token expirou
   const isTokenExpired = () => {
@@ -332,6 +376,15 @@ export default function FormPage() {
     return localStorage.getItem("accessToken");
   };
 
+
+    // Função para resetar o formulário
+  function resetForm() {
+    setFormData(initialFormData);
+    setPhotoPreview(null);
+    if (photoInputRef.current) photoInputRef.current.value = "";
+    if (filesInputRef.current) filesInputRef.current.value = "";
+  }
+
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!driveConfig) {
@@ -404,7 +457,7 @@ const handleSubmit = async (e: React.FormEvent) => {
     }
 
     toast("Salvo com sucesso!");
-    // ... aqui você limpa o form etc.
+    resetForm();
 
   } catch (err: any) {
     console.error(err);
@@ -416,6 +469,11 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   return (
     <Card className="max-w-xl mx-auto p-6">
+      {config.formHeaderText && (
+        <p className="mb-4 text-gray-700">
+          {config.formHeaderText}
+        </p>
+      )}
       <form onSubmit={handleSubmit} className="space-y-6">
 
         {/* Nome */}
@@ -500,12 +558,19 @@ const handleSubmit = async (e: React.FormEvent) => {
         <div className="space-y-1">
           <Label>Número de Microfones: {formData.microphoneCount}</Label>
           <Slider
+            value={[formData.microphoneCount]}
+            onValueChange={(values: number[]) =>
+              handleChange("microphoneCount", values[0])
+            }
             min={1}
             max={6}
             step={1}
-            defaultValue={[formData.microphoneCount]}
-            onValueChange={(values: number[]) => handleChange("microphoneCount", values[0])}
-          />
+          >
+            <SliderTrack>
+              <SliderRange />
+            </SliderTrack>
+            <SliderThumb index={0} />
+          </Slider>
         </div>
 
         {/* Versão da Bíblia */}
@@ -552,7 +617,14 @@ const handleSubmit = async (e: React.FormEvent) => {
         {/* Foto */}
         <div className="space-y-1">
           <Label>Foto do Participante</Label>
-          <input id="user-photo" type="file" accept="image/*" className="hidden" onChange={handlePhotoChange} />
+          <input
+            ref={photoInputRef}
+            id="user-photo"
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handlePhotoChange}
+          />
           <Button asChild type="button" variant="outline">
             <label htmlFor="user-photo">Enviar Foto</label>
           </Button>
@@ -560,13 +632,37 @@ const handleSubmit = async (e: React.FormEvent) => {
         </div>
 
         {/* Arquivos */}
-        <div className="space-y-1">
-          <Label>Arquivos</Label>
-          <input id="upload-files" type="file" multiple accept={extensionList} className="hidden" onChange={handleFilesChange} />
-          <Button asChild type="button" variant="outline">
-            <label htmlFor="upload-files">Selecionar Arquivos</label>
-          </Button>
-        </div>
+  <div className="space-y-1">
+    <Label>Arquivos</Label>
+    <input
+      ref={filesInputRef}
+      id="upload-files"
+      type="file"
+      multiple
+      accept={extensionList}
+      className="hidden"
+      onChange={handleFilesChange}
+    />
+    <Button asChild type="button" variant="outline">
+      <label htmlFor="upload-files">Selecionar Arquivos</label>
+    </Button>
+
+    {/* --- AQUI: lista de arquivos selecionados --- */}
+    {formData.files.length > 0 && (
+      <Card className="mt-2">
+        <CardContent className="space-y-1">
+          <ul>
+            {formData.files.map((file, idx) => (
+              <li key={idx} className="flex items-center gap-2">
+                <File className="w-4 h-4" />
+                <span className="text-sm">{file.name}</span>
+              </li>
+            ))}
+          </ul>
+        </CardContent>
+      </Card>
+    )}
+  </div>
 
         {/* Observações */}
         <div className="space-y-1">
@@ -578,16 +674,29 @@ const handleSubmit = async (e: React.FormEvent) => {
           />
         </div>
 
-        {/* Membro e direitos */}
-        <div className="flex items-center space-x-2">
-          <Checkbox checked={formData.isMember} onCheckedChange={v => handleChange("isMember", v)} />
-          <span>É membro da IASD?</span>
-        </div>
+        {/* Campo “É membro” */}
+        {config.showMemberField && (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={formData.isMember}
+              onCheckedChange={v => handleChange("isMember", v)}
+            />
+            <span>{config.memberFieldLabel}</span>
+          </div>
+        )}
 
-        <div className="flex items-center space-x-2">
-          <Checkbox checked={formData.imageRightsGranted} onCheckedChange={v => handleChange("imageRightsGranted", v)} disabled={formData.isMember} />
-          <span>Concedo uso de imagem.</span>
-        </div>
+        {/* Campo “Consentimento de imagem” */}
+        {config.showImageConsentField && (
+          <div className="flex items-center space-x-2">
+            <Checkbox
+              checked={formData.imageRightsGranted}
+              onCheckedChange={v => handleChange("imageRightsGranted", v)}
+              disabled={config.autoConsentForMembers && formData.isMember}
+            />
+            <span>{config.imageConsentLabel}</span>
+          </div>
+        )}
+
 
         {/* Submit */}
         <Button type="submit" className="w-full mt-6" disabled={isSubmitting}>
@@ -597,4 +706,3 @@ const handleSubmit = async (e: React.FormEvent) => {
     </Card>
   );
 }
-

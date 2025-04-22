@@ -49,6 +49,7 @@ model Institution {
   id                 String                    @id @default(cuid())
   name               String
   slug               String                    @unique
+  colorScheme        String      @default("azul") // nome exato dos temas do DaisyUI
   createdAt          DateTime                  @default(now())
   participants       Participant[]
   users              User[]
@@ -56,7 +57,73 @@ model Institution {
   programParts       ProgramPart[] // idem
   bibleVersions      InstitutionBibleVersion[] // relação N‑N para habilitações
   driveConfig        DriveConfig?
+  FormConfig         FormConfig[]
+  InstitutionProfile InstitutionProfile?
+  events     Event[]
+
 }
+
+model Event {
+  id             String     @id @default(cuid())
+  slug           String     @unique
+  name           String
+  description    String?
+  isOpen         Boolean    @default(false)
+  startsAt       DateTime
+  endsAt         DateTime?
+  createdAt      DateTime   @default(now())
+
+  // NOVOS CAMPOS DE MÍDIA
+  hasStreaming   Boolean    @default(false) // haverá transmissão ao vivo?
+  hasPhoto       Boolean    @default(false) // serão tiradas fotos?
+
+  // relação com Instituição
+  institution    Institution @relation(fields: [institutionId], references: [id])
+  institutionId  String
+
+  // áreas de evento (permitidas ou não gravações)
+  areas          Area[]
+
+  visitors       Visitor[]
+  notices        Notice[]
+}
+
+model Area {
+  id             String   @id @default(cuid())
+  name           String   // ex: "Área VIP", "Espaço Silencioso"
+  description    String?  // detalhes opcionais
+  allowRecording Boolean  @default(true) // se false → livre de registro
+
+  // pertence a um Event
+  event          Event    @relation(fields: [eventId], references: [id])
+  eventId        String
+  isActive       Boolean  @default(true) // para desativar
+}
+
+model Visitor {
+  id               String    @id @default(cuid())
+  name             String?   // opcional para quem quiser anonimato
+  phone            String?
+  email            String?
+  isFirstVisit     Boolean   @default(true)
+  isMember         Boolean   @default(false)
+  anonymous        Boolean   @default(false)
+  agreeImageRights Boolean   @default(false)
+  registeredAt     DateTime  @default(now())
+  event            Event     @relation(fields: [eventId], references: [id])
+  eventId          String
+}
+
+model Notice {
+  id           String   @id @default(cuid())
+  message      String
+  createdAt    DateTime @default(now())
+
+  //–– vincula ao evento
+  event        Event    @relation(fields: [eventId], references: [id])
+  eventId      String
+}
+
 
 model Participant {
   id            Int         @id @default(autoincrement())
@@ -87,7 +154,7 @@ model Participant {
   microphoneCount Int           @default(1)
   bibleVersionId  String? // FK pra quem for o dropdown
   bibleVersion    BibleVersion? @relation(fields: [bibleVersionId], references: [id])
-  observations       String?            
+  observations    String?
 
   // foto e arquivos
   userPhotoUrl String? // URL da foto no Drive
@@ -116,6 +183,33 @@ model DriveConfig {
   sharedDriveId      String
   isActive           Boolean     @default(true)
   updatedAt          DateTime    @updatedAt
+}
+
+model FormConfig {
+  id                    String      @id @default(cuid())
+  institution           Institution @relation(fields: [institutionId], references: [id])
+  institutionId         String      @unique
+  showMemberField       Boolean     @default(true)
+  memberFieldLabel      String      @default("É membro dessa denominação?")
+  showImageConsentField Boolean     @default(true)
+  imageConsentLabel     String      @default("Concedeu uso de imagem?")
+  formHeaderText        String?     @default("")
+  showOtherField        Boolean     @default(false)
+  otherFieldLabel       String      @default("Outro campo?")
+  autoConsentForMembers Boolean     @default(false)
+  updatedAt             DateTime    @updatedAt
+}
+
+model InstitutionProfile {
+  id            String      @id @default(cuid())
+  institution   Institution @relation(fields: [institutionId], references: [id])
+  institutionId String      @unique
+  // campos de branding/contato
+  churchName    String?     @default("")
+  churchLogoUrl String?     @default("")
+  churchPhone   String?     @default("")
+  churchAddress String?     @default("")
+  updatedAt     DateTime    @updatedAt
 }
 
 // NextAuth models: Account, Session e VerificationToken

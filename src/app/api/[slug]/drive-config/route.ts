@@ -4,7 +4,16 @@ import { prisma } from "@/lib/prisma";
 export async function GET(_: Request, { params }: { params: { slug: string } }) {
   const inst = await prisma.institution.findUnique({
     where: { slug: params.slug },
-    include: { driveConfig: true },
+    select: {
+      driveConfig: {
+        select: {
+          clientEmail: true,
+          sharedDriveId: true,
+          isActive: true,
+          // não inclua serviceAccountJson
+        }
+      }
+    }
   });
   if (!inst) return NextResponse.json({ error: "Instituição não existe" }, { status: 404 });
   return NextResponse.json(inst.driveConfig || null);

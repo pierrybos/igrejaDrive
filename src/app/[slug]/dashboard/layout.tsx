@@ -1,18 +1,51 @@
 // src/app/[slug]/dashboard/layout.tsx
-import Link from "next/link";
+import { Metadata } from "next";
+import DashboardSidebar from "@/components/DashboardSidebar";
 import { ReactNode } from "react";
 import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 import { authOptions } from "../../api/auth/[...nextauth]/route";
 import { prisma } from "@/lib/prisma";
 
-interface Props { children: ReactNode; params: Promise<{ slug: string }>
- }
+interface Props {
+  children: ReactNode;
+  params: { slug: string };
+}
+
+// 1️⃣ Função que o Next chama para gerar <head> dinamicamente
+export async function generateMetadata({
+  params,
+}: {
+  params: { slug: string };
+}): Promise<Metadata> {
+  const { slug } = params;
+  // busca só o nome da igreja
+  const institution = await prisma.institution.findUnique({
+    where: { slug },
+    select: { name: true },
+  });
+
+  if (!institution) {
+    return {
+      title: "IgrejaDrive",
+      description: "Gerencie sua igreja",
+      // você pode incluir openGraph, twitter, etc.
+    };
+  }
+
+  return {
+    title: `${institution.name} • Dashboard`,
+    description: `Painel de controle da ${institution.name}`,
+    openGraph: {
+      title: institution.name,
+      description: `Painel de controle da ${institution.name}`,
+    },
+  };
+}
 
 export default async function DashboardLayout({ children, params }: Props) {
   const session = await getServerSession(authOptions);
-  const { slug } = await params
-
+  const { slug } = params;
 
   if (!session) {
     return redirect(`/${slug}/login`);
@@ -61,27 +94,8 @@ export default async function DashboardLayout({ children, params }: Props) {
   // 7) Passou por todos os checks → renderiza o dashboard
   return (
     <div className="flex min-h-screen">
-      <aside className="w-56 border-r p-4 space-y-2">
-        <nav className="space-y-1">
-          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard`}>
-            Visão Geral
-          </Link>
-          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/participants`}>
-              Participações
-          </Link>
-          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/participation-types`}>
-              Tipos de Participação
-          </Link>
-          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/program-parts`}>
-              Partes do Programa
-          </Link>
-          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/bible-version`}>
-              Versões da Bíblia
-          </Link>
-          <Link className="block px-3 py-1 rounded hover:bg-gray-100" href={`/${slug}/dashboard/drive-config`}>
-              Configurações do Drive
-          </Link>
-        </nav>
+      <aside className="w-56 border-r p-4">
+        <DashboardSidebar slug={slug} />
       </aside>
       <main className="flex-1 p-6">{children}</main>
     </div>
