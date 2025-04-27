@@ -20,7 +20,7 @@ export default function Header({
       )}
         <h1 className="text-xl font-bold">{profile.churchName}</h1>
       </div>
-      <ThemeToggle />
+      {/*<ThemeToggle />*/}
     </header>
   );
 }

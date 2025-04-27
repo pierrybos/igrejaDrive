@@ -20,7 +20,7 @@ export default function ThemeToggle() {
 
   return (
     <Button onClick={() => setTheme(current === "dark" ? "azul" : "dark")}>
-      {current === "dark" ? "🌞 Claro" : "🌙 Escuro"}
+      {current === "dark" ? "🌞 Claro" : "🌙 Escuro?"}
     </Button>
   );
 }

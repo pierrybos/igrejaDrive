@@ -13,6 +13,7 @@ export default function DashboardSidebar({ slug }: SidebarProps) {
 
   const sections = [
     { label: 'Visão Geral', href: `/${slug}/dashboard` },
+    { label: 'Gerenciar Eventos', href: `/${slug}/events` },
     {
       label: 'Participações',
       items: [

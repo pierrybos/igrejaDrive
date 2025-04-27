@@ -9,7 +9,7 @@ export function DarkModeToggle({
 }) {
   return (
     <button className="btn btn-secondary" onClick={onToogleTheme}>
-      {theme === "dark" ? "🌙 Escuro" : "🌞 Claro" }
+      {theme === "dark" ? "🌙 Escuro." : "🌞 Claro" }
     </button>
   );
 }

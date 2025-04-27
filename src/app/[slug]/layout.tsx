@@ -5,11 +5,11 @@ import { prisma } from "@/lib/prisma";
 import { DEFAULT_INSTITUTION_PROFILE } from "@/lib/institutionProfile";
 import Header from "@/components/ui/Header";
 import Footer from "@/components/ui/Footer";
-import ThemeWrapper from "@/components/ThemeWrapper";
+import { StoreProvider } from "./store/StoreProvider";
 
 interface SlugLayoutProps {
   children: React.ReactNode;
-  params: { slug: string };
+  params: Promise<{ slug: string }>;           // ← agora é Promise
 }
 
 // Simulação manual temporária
@@ -28,13 +28,16 @@ const slugThemes: Record<string, string> = {
 export async function generateMetadata({
   params,
 }: {
-  params: { slug: string };
+  params: Promise<{ slug: string }>;           // ← Promise aqui também
 }): Promise<Metadata> {
+  const { slug } = await params;                // ← await o params
+
   // busca só o nome da igreja
   const inst = await prisma.institution.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     select: { id: true },
   });
+
   let churchName = "IgrejaDrive";
   if (inst) {
     const dbProfile = await prisma.institutionProfile.findUnique({
@@ -56,9 +59,16 @@ export async function generateMetadata({
   };
 }
 
-export default async function SlugLayout({ children, params }: SlugLayoutProps) {
+// 2️⃣: componente de layout
+export default async function SlugLayout({
+  children,
+  params,
+}: SlugLayoutProps) {
+  const { slug } = await params;                // ← await aqui também
+
+  // carrega só o id da instituição
   const inst = await prisma.institution.findUnique({
-    where: { slug: params.slug },
+    where: { slug },
     select: { id: true },
   });
 
@@ -70,7 +80,7 @@ export default async function SlugLayout({ children, params }: SlugLayoutProps) 
 
   const theme = institution?.colorScheme || 'azul'; // tema padrão se não houver definido
 */
-    const theme = slugThemes[params.slug] || 'azul'; // default azul
+    const theme = slugThemes[slug] || 'azul'; // default azul
 
 
   // 2) carrega o profile ou usa defaults
@@ -90,14 +100,16 @@ export default async function SlugLayout({ children, params }: SlugLayoutProps) 
   }
 
   return (
-    <ThemeWrapper initialTheme={theme}>
-      <Header profile={profile} />
+    <>
+    <StoreProvider>
+      <Header profile={profile} theme={theme} />
       <div className="flex flex-1 gap-6">
         <main className="flex-1 p-6 bg-base-100 text-base-content rounded-lg shadow-sm">
           {children}
         </main>
       </div>
       <Footer profile={profile} />
-    </ThemeWrapper>
+      </StoreProvider>
+    </>
   );
 }

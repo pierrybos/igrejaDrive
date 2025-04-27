@@ -34,7 +34,7 @@ export default function ThemeWrapper({
         className="btn btn-sm btn-secondary fixed top-4 right-4 z-50"
         onClick={() => setTheme((prev) => (prev === "dark" ? initialTheme : "dark"))}
       >
-        {theme === "dark" ? "🌞 Claro" : "🌙 Escuro"}
+        {theme === "dark" ? "🌞 Claro" : "🌙 Escuro!"}
       </button>
       {children}
     </div>

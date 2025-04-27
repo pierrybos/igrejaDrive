@@ -1,9 +1,11 @@
 // src/app/providers.tsx
 "use client";
 
-import { SessionProvider } from "next-auth/react";
-import { ThemeProvider as NextThemesProvider } from "next-themes";
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect, useState } from 'react'
+import { Provider as ReduxProvider } from 'react-redux'
+import { store } from '@/store'
+import { SessionProvider } from 'next-auth/react'
+import { ThemeProvider as NextThemesProvider } from 'next-themes'
 
 const themes = [
   "azul",
@@ -35,10 +37,9 @@ export function Providers({
   }
 
 return (
-    // 1️⃣ SessionProvider sempre renderiza (SSR+CSR igual)
+  <ReduxProvider store={store}>
     <SessionProvider>
       {mounted ? (
-        // 2️⃣ Só depois do mount aplicamos o ThemeProvider
         <NextThemesProvider
           attribute="data-theme"
           defaultTheme="azul"
@@ -49,9 +50,9 @@ return (
           {children}
         </NextThemesProvider>
       ) : (
-        // Enquanto não montou, renderiza só as páginas (sem tema dinâmico)
         <>{children}</>
       )}
     </SessionProvider>
+  </ReduxProvider>
   );
 }
