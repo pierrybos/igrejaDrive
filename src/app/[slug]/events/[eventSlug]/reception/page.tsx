@@ -15,12 +15,14 @@ import {
   Dialog,
   DialogTrigger,
   DialogContent,
+  DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "@/components/ui/sonner";
+import { socket } from "@/socket"              // ← importe aqui
 
 interface EventDetails {
   id: string;
@@ -30,6 +32,8 @@ interface EventDetails {
   endsAt?: string;
   hasStreaming: boolean;
   hasPhoto: boolean;
+  isOpen: boolean              // ← adicionado
+
 }
 
 interface AreaType {
@@ -56,6 +60,8 @@ export default function Reception() {
   // 2) conecta ao Redux
   const dispatch = useDispatch<AppDispatch>();
   const visitors = useSelector((s: RootState) => s.event.visitors);
+  const [noticeText, setNoticeText] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false)
 
   // Estado local pra detalhes do evento
   const [eventDetails, setEventDetails] = useState<EventDetails | null>(null);
@@ -68,14 +74,16 @@ export default function Reception() {
     isMember: false,
     agreeImageRights: false,
   });
-  const [noticeText, setNoticeText] = useState("");
 
   useEffect(() => {
-    if (!slug || !eventSlug) return;
+    if (slug && eventSlug) {
 
     // 1) carregar lista de visitantes
     dispatch(fetchVisitors({ slug, eventSlug }));
-      dispatch(fetchNotices({ slug, eventSlug }));
+    dispatch(fetchNotices({ slug, eventSlug }));
+    socket.on('visitorAdded', (visitor) => {
+      dispatch(setVisitors(visitor))
+    })
 
     // 2) buscar detalhes do evento
     fetch(`/api/${slug}/events/${eventSlug}`)
@@ -86,10 +94,16 @@ export default function Reception() {
     fetch(`/api/${slug}/events/${eventSlug}/areas`)
       .then((res) => res.json())
       .then((data: AreaType[]) => setAreas(data));
-  }, [dispatch, slug, eventSlug]);
+     
+    }
+    return () => {
+      socket.off('visitorAdded')
+    }
+  
+    }, [dispatch, slug, eventSlug]);
 
   // 5) handlers de envio (exemplo)
-  const handleAddVisitor = (e: React.FormEvent) => {
+  const handleAddVisitor = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!eventDetails) return;
 
@@ -111,14 +125,16 @@ export default function Reception() {
     const payload = {
       slug,
       eventSlug,
-      name: newVisitor.anonymous ? null : newVisitor.name,
-      phone: newVisitor.anonymous ? null : newVisitor.phone || null,
-      email: newVisitor.anonymous ? null : newVisitor.email || null,
+      name: newVisitor.anonymous ? null : newVisitor.name?? null,
+      phone: newVisitor.anonymous ? null : newVisitor.phone ?? null,
+      email: newVisitor.anonymous ? null : newVisitor.email ?? null,
       isMember: newVisitor.anonymous ? false : newVisitor.isMember,
       anonymous: newVisitor.anonymous,
       agreeImageRights: newVisitor.agreeImageRights,
     };
-    dispatch(addVisitor(payload));
+    await dispatch(addVisitor(payload))
+    // fecha modal e reseta form
+    setDialogOpen(false)
 
     // reset form
     setNewVisitor({
@@ -135,6 +151,17 @@ export default function Reception() {
     <div className="p-4 space-y-6">
       {/* 1) Informações básicas do evento */}
       {eventDetails && (
+        <>
+  <div
+    className={
+      `px-3 py-1 inline-block rounded-full text-sm font-medium ` +
+      (eventDetails.isOpen
+        ? 'bg-green-100 text-green-800'
+        : 'bg-red-100 text-red-800')
+    }
+  >
+    {eventDetails.isOpen ? 'Evento Aberto' : 'Evento Encerrado'}
+  </div>
         <section className="space-y-2">
           <h1 className="text-2xl font-bold">{eventDetails.name}</h1>
           {eventDetails.description && <p>{eventDetails.description}</p>}
@@ -153,15 +180,16 @@ export default function Reception() {
             Fotos: {eventDetails.hasPhoto ? "✅" : "❌"}
           </p>
         </section>
+        </>
       )}
 
       {/* 2) Botão que abre o diálogo para cadastrar visitante */}
-      <Dialog>
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
-          <Button>Cadastrar Visitante</Button>
+          <Button onClick={() => setDialogOpen(true)}>Cadastrar Visitante</Button>
         </DialogTrigger>
         <DialogContent className="max-w-md space-y-4">
-          <h2 className="text-xl font-semibold">Novo Visitante</h2>
+          <DialogTitle>Novo Visitante</DialogTitle>
           <form onSubmit={handleAddVisitor} className="space-y-4">
             {/* Anonymous */}
             <div className="flex items-center space-x-2">

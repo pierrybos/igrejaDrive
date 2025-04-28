@@ -2,8 +2,20 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit'
 import { socket } from '@/socket'
 
-interface Visitor { id: string; name: string }
-interface Notice  { id: string; message: string }
+interface Visitor {
+  id: string
+  name: string | null
+  phone: string | null
+  email: string | null
+  isMember: boolean
+  anonymous: boolean
+  agreeImageRights: boolean
+}
+
+interface Notice {
+  id: string
+  message: string
+}
 
 interface EventState {
   visitors: Visitor[]
@@ -21,27 +33,7 @@ export const fetchVisitors = createAsyncThunk(
   }
 )
 
-export const addVisitor = createAsyncThunk(
-  'event/addVisitor',
-  async (
-    payload: { slug: string; eventSlug: string; name: string },
-    { dispatch }
-  ) => {
-    // essa chamada grava via Next.js→Prisma
-    await fetch(
-      `/api/${payload.slug}/events/${payload.eventSlug}/visitors`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: payload.name }),
-      }
-    )
-    // dispara evento WebSocket
-    socket.emit('addVisitor', payload)
-  }
-)
-
-// notices
+// ⏳ buscar avisos/notices
 export const fetchNotices = createAsyncThunk(
   'event/fetchNotices',
   async ({ slug, eventSlug }: { slug: string; eventSlug: string }) => {
@@ -50,13 +42,45 @@ export const fetchNotices = createAsyncThunk(
   }
 )
 
+// ⏳ adicionar visitante
+export const addVisitor = createAsyncThunk(
+  'event/addVisitor',
+  async (
+    payload: {
+      slug: string
+      eventSlug: string
+      name: string | null
+      phone: string | null
+      email: string | null
+      isMember: boolean
+      anonymous: boolean
+      agreeImageRights: boolean
+    },
+    { dispatch }
+  ) => {
+    const res = await fetch(
+      `/api/${payload.slug}/events/${payload.eventSlug}/visitors`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      }
+    )
+    const saved: Visitor = await res.json()
+    // dispara pelo WebSocket para outros clientes
+    socket.emit('addVisitor', saved)
+    return saved
+  }
+)
+
+// ⏳ adicionar aviso/notice
 export const addNotice = createAsyncThunk(
   'event/addNotice',
   async (
     payload: { slug: string; eventSlug: string; message: string },
     { dispatch }
   ) => {
-    await fetch(
+    const res = await fetch(
       `/api/${payload.slug}/events/${payload.eventSlug}/notices`,
       {
         method: 'POST',
@@ -64,7 +88,9 @@ export const addNotice = createAsyncThunk(
         body: JSON.stringify({ message: payload.message }),
       }
     )
-    socket.emit('addNotice', payload)
+    const saved: Notice = await res.json()
+    socket.emit('addNotice', saved)
+    return saved
   }
 )
 
@@ -72,11 +98,12 @@ const eventSlice = createSlice({
   name: 'event',
   initialState,
   reducers: {
-    setVisitors(state, action: PayloadAction<Visitor[]>) {
-      state.visitors = action.payload
+    // ações síncronas para socket
+    setVisitors: (state, { payload }: PayloadAction<Visitor>) => {
+      state.visitors.push(payload)
     },
-    setNotices(state, action: PayloadAction<Notice[]>) {
-      state.notices = action.payload
+    setNotices: (state, { payload }: PayloadAction<Notice>) => {
+      state.notices.push(payload)
     },
   },
   extraReducers: builder => {
@@ -87,8 +114,23 @@ const eventSlice = createSlice({
       .addCase(fetchNotices.fulfilled, (state, { payload }) => {
         state.notices = payload
       })
+      .addCase(addVisitor.fulfilled, (state, { payload }) => {
+        state.visitors.push(payload)
+      })
+      .addCase(addNotice.fulfilled, (state, { payload }) => {
+        state.notices.push(payload)
+      })
   },
 })
 
 export const { setVisitors, setNotices } = eventSlice.actions
 export default eventSlice.reducer
+
+// **Novo**: configurar listeners no cliente assim que o store é carregado
+socket.on('visitorAdded', (visitor: Visitor) => {
+  // despacha a ação para inserir no estado
+  store.dispatch(setVisitors(visitor))
+})
+socket.on('noticeAdded', (notice: Notice) => {
+  store.dispatch(setNotices(notice))
+})
